@@ -30,6 +30,7 @@ fn parse_git_status(output: String) -> String {
                              .collect::<Vec<&str>>()[0][3..]
                              .to_string();
     if split.len() < 2 { return result; } // no file mod lines
+    // TODO probably faster not to use a hashmap
     let mut status_count = HashMap::new();
     for line in &split[1..] {
         let index = if line.starts_with(" ") { 1 } else { 0 };
