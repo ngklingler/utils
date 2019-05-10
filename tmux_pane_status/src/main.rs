@@ -21,6 +21,7 @@ fn cd(new_dir: &String) {
 }
 
 fn parse_git_status(output: String) -> String {
+    // TODO this isn't working, prints fatal line out (sterr?)
     if output == "" || output.starts_with("fatal") { 
         return String::from(""); 
     }
