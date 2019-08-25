@@ -68,6 +68,7 @@ def main():
     elif sys.argv[1] == 'gen':
         generate_password(sys.argv[2], sys.argv[3], sys.argv[4])
     elif sys.argv[1] == 'get':
+        # TODO error if record doesn't exist
         record = get_record(sys.argv[2])
         calculate_password(
             record['salt'], record['encoding'], record['length']
