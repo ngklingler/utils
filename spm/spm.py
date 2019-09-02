@@ -1,78 +1,74 @@
-import base64
-import hashlib
-import json
+''' CSV implicit header: domain, salt, encoding, length, optional username '''
 import os
 import sys
+from getpass import getpass
+from base64 import *
+from hashlib import scrypt
 
 CONFIG = f'{os.environ["HOME"]}/.config/spm/'
 
 
-def get_record(domain):
-    with open(f'{CONFIG}state', 'r') as f:
-        state = json.load(f)
-        record = state[domain]
-        record['salt'] = base64.b85decode(record['salt'])
-    return record
+def get_records(domain):
+    result = []
+    with open(f'{CONFIG}state', 'r') as file:
+        file = file.read().split('\n')
+        for row in file:
+            if row.startswith(domain + ','):
+                result.append(row)
+            elif result:
+                break
+    return result
 
 
-def store_record(domain, salt, encoding, length):
-    with open(f'{CONFIG}state', 'r') as f:
-        state = json.load(f)
-    state[domain] = {
-        'salt': base64.b85encode(salt).decode('utf-8'),
-        'encoding': encoding,
-        'length': length,
-    }
-    with open(f'{CONFIG}state', 'w') as f:
-        json.dump(state, f)
+def store_record(domain, salt, base, length, username=''):
+    salt = b85encode(salt).decode('utf-8')
+    record = f'{domain},{salt},{base[-2:]},{length},{username}'
+    with open(f'{CONFIG}state', 'r') as file:
+        file = file.read().split('\n')
+        for i in range(0, len(file)):
+            if record < row:
+                file.insert(i, record)
+                break
+        else:
+            file.append(record)
+    with open(f'{CONFIG}state', 'w') as dest:
+        dest.write('\n'.join(file))
 
 
-def calculate_password(salt, encoding, length):
-    if type(length) == str:
-        length = int(length)
+def calculate_password(salt, base, length):
     with open(f'{CONFIG}seed', 'r') as f:
         seed = bytes(f.read(), 'utf-8')
-    # TODO use getpass
-    pin = bytes(input("Input your PIN: "), 'utf-8')
-    key = hashlib.scrypt(seed + pin, salt=salt, n=16384, r=8, p=1)
-    assert encoding[4:] in ['16', '32', '64', '85']
-    print(
-        eval(f'base64.b{encoding[4:]}encode({key})').decode('utf-8')[:length]
-    )
+    pin = bytes(getpass("Input your PIN: "), 'utf-8')
+    key = scrypt(seed + pin, salt=salt, n=16384, r=8, p=1)
+    assert base[-2:] in ['16', '32', '64', '85']
+    return eval(f'b{base[-2:]}encode({key})').decode('utf-8')[: int(length)]
 
 
-def generate_password(domain, length, encoding):
+def generate_password(domain, length, base, username):
     salt = os.urandom(16)
-    store_record(domain, salt, encoding, length)
-    calculate_password(salt, encoding, length)
+    store_record(domain, salt, base, length, username)
+    calculate_password(salt, base, length)
 
 
-def init(how):
-    os.system(f'[ -f {CONFIG}state ] || echo {{}} > {CONFIG}state')
-    if how == 'new':
-        os.system(f'mkdir -p {CONFIG}')
-        os.system(f'pgen > {CONFIG}seed')
-        print("Here is your 12 word seed. Please record it.")
-        os.system(f'cat {CONFIG}seed')
-    elif how == 'restore':
-        seed = input('Enter your seed: ')
-        with open(f'{CONFIG}seed', 'w') as f:
-            f.write(seed)
-    else:
-        print("Error, unrecognized parameter passed to init")
+def print_records(records):
+    for rec in records:
+        rec = rec.split(',')
+        rec[1] = b85decode(rec[1])
+        if rec[-1]:
+            print(f'Username: {username}, ', end='')
+        print(f'Password: {calculate_password(rec[1], rec[2], rec[3])}')
 
 
 def main():
-    if sys.argv[1] == 'init':
-        init(sys.argv[2])
-    elif sys.argv[1] == 'gen':
-        generate_password(sys.argv[2], sys.argv[3], sys.argv[4])
+    if sys.argv[1] == 'generate':
+        user = sys.argv[5] if len(sys.argv) > 5 else ''
+        generate_password(sys.argv[2], sys.argv[3], sys.argv[4], user)
     elif sys.argv[1] == 'get':
-        # TODO error if record doesn't exist
-        record = get_record(sys.argv[2])
-        calculate_password(
-            record['salt'], record['encoding'], record['length']
-        )
+        records = get_records(sys.argv[2])
+        if not records:
+            print('Error: no records found for that domain')
+            return
+        print_records(records)
 
 
 if __name__ == '__main__':
