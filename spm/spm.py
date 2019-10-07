@@ -26,7 +26,7 @@ def store_record(domain, salt, base, length, username=''):
     with open(f'{CONFIG}state', 'r') as file:
         file = file.read().split('\n')
         for i in range(0, len(file)):
-            if record < row:
+            if record < file[i]:
                 file.insert(i, record)
                 break
         else:
@@ -48,6 +48,7 @@ def generate_password(domain, length, base, username):
     salt = os.urandom(16)
     store_record(domain, salt, base, length, username)
     calculate_password(salt, base, length)
+    # TODO print after generation
 
 
 def print_records(records):
@@ -55,7 +56,7 @@ def print_records(records):
         rec = rec.split(',')
         rec[1] = b85decode(rec[1])
         if rec[-1]:
-            print(f'Username: {username}, ', end='')
+            print(f'Username: {rec[-1]}, ', end='')
         print(f'Password: {calculate_password(rec[1], rec[2], rec[3])}')
 
 
